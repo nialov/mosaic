@@ -1,4 +1,5 @@
 import time
+from hashlib import sha256
 from itertools import count
 from pathlib import Path
 
@@ -11,8 +12,8 @@ NIXOS_IMAGE_PATH = LIBRARY_1_PATH / "nixos_logo.png"
 
 
 @pytest.mark.parametrize("target_image, tile_dir", [(NIXOS_IMAGE_PATH, LIBRARY_1_PATH)])
-def test_main(target_image, tile_dir, tmp_path: Path, image_regression):
-    output_image = tmp_path / "output.jpg"
+def test_main(target_image, tile_dir, tmp_path: Path, data_regression):
+    output_image = tmp_path / "output.png"
     result_queue = mosaic.mosaic(
         img_path=target_image, tiles_path=tile_dir, output_image=output_image
     )
@@ -27,4 +28,8 @@ def test_main(target_image, tile_dir, tmp_path: Path, image_regression):
 
     assert result_queue.empty(), result_queue
     assert output_image.exists(), output_image
-    image_regression.check(output_image.read_bytes())
+    image_bytes = output_image.read_bytes()
+    sha256_hash = sha256()
+    sha256_hash.update(image_bytes)
+
+    data_regression.check(dict(image_hash=sha256_hash.hexdigest()))
