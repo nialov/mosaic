@@ -2,22 +2,20 @@
   description = "Flake utils demo";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nix-extra.url = "github:nialov/nix-extra";
-  inputs.nixpkgs.follows = "nix-extra/nixpkgs";
+  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
 
   outputs = { self, ... }@inputs:
     (inputs.flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import inputs.nixpkgs {
           inherit system;
-          overlays =
-            [ self.overlays.default inputs.nix-extra.overlays.default ];
+          overlays = [ self.overlays.default ];
 
         };
       in {
         packages = {
-          inherit (pkgs) mosaic-dev;
-          default = self.packages."${system}".mosaic-dev;
+          inherit (pkgs) mosaic;
+          default = self.packages."${system}".mosaic;
         };
         devShells = {
           default = pkgs.mkShell {
@@ -26,14 +24,14 @@
               python3Packages.pytest
               python3Packages.pytest-regressions
             ];
-            inputsFrom = [ self.packages."${system}".mosaic-dev ];
+            inputsFrom = [ self.packages."${system}".mosaic ];
           };
         };
-        checks = { inherit (pkgs) mosaic-dev; };
+        checks = { inherit (pkgs) mosaic; };
       })) // {
 
         overlays.default = final: prev: {
-          mosaic-dev = prev.callPackage ./. { };
+          mosaic = prev.callPackage ./. { };
 
         };
       };
