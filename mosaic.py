@@ -5,6 +5,7 @@ import sys
 from multiprocessing import Process, Queue, cpu_count
 from pathlib import Path
 
+import typer
 from PIL import Image, ImageOps
 
 # Change these 3 config parameters to suit your needs...
@@ -18,6 +19,8 @@ TILE_BLOCK_SIZE = TILE_SIZE / max(min(TILE_MATCH_RES, TILE_SIZE), 1)
 WORKER_COUNT = max(cpu_count() - 1, 1)
 OUT_FILE = "mosaic.jpeg"
 EOQ_VALUE = None
+
+APP = typer.Typer()
 
 
 class TileProcessor:
@@ -68,16 +71,6 @@ class TileProcessor:
             if all(tile is not None for tile in (large_tile, small_tile)):
                 large_tiles.append(large_tile)
                 small_tiles.append(small_tile)
-
-        # for root, subFolders, files in os.walk(self.tiles_directory):
-        #     for tile_name in files:
-        #         tile_path = Path(os.path.join(root, tile_name)).resolve()
-        #         assert tile_path.exists()
-        #         print("Reading {:40.40}".format(str(tile_path)), flush=True, end="\r")
-        #         large_tile, small_tile = self.__process_tile(tile_path)
-        #         if large_tile:
-        #             large_tiles.append(large_tile)
-        #             small_tiles.append(small_tile)
 
         print("Processed {} tiles.".format(len(large_tiles)))
 
@@ -194,7 +187,9 @@ class MosaicImage:
         self.image.save(path)
 
 
-def build_mosaic(result_queue, all_tile_data_large, original_img_large):
+def build_mosaic(
+    result_queue, all_tile_data_large, original_img_large, output_image: Path
+):
     mosaic = MosaicImage(original_img_large)
 
     active_workers = WORKER_COUNT
@@ -213,11 +208,11 @@ def build_mosaic(result_queue, all_tile_data_large, original_img_large):
         except KeyboardInterrupt:
             pass
 
-    mosaic.save(OUT_FILE)
-    print("\nFinished, output is in", OUT_FILE)
+    mosaic.save(output_image)
+    print("\nFinished, output is in", output_image)
 
 
-def compose(original_img, tiles):
+def compose(original_img, tiles, output_image: Path):
     print("Building mosaic, press Ctrl-C to abort...")
     original_img_large, original_img_small = original_img
     tiles_large, tiles_small = tiles
@@ -234,7 +229,7 @@ def compose(original_img, tiles):
         # start the worker processes that will build the mosaic image
         Process(
             target=build_mosaic,
-            args=(result_queue, all_tile_data_large, original_img_large),
+            args=(result_queue, all_tile_data_large, original_img_large, output_image),
         ).start()
 
         # start the worker processes that will perform the tile fitting
@@ -276,28 +271,40 @@ def show_error(msg):
     print("ERROR: {}".format(msg))
 
 
-def mosaic(img_path, tiles_path):
+def mosaic(img_path, tiles_path, output_image: Path):
     image_data = TargetImage(img_path).get_data()
     tiles_data = TileProcessor(tiles_path).get_tiles()
     if tiles_data[0]:
-        compose(image_data, tiles_data)
+        compose(image_data, tiles_data, output_image=output_image)
     else:
         show_error("No images found in tiles directory '{}'".format(tiles_path))
 
 
-def main():
-    if len(sys.argv) < 3:
-        show_error("Usage: {} <image> <tiles directory>\r".format(sys.argv[0]))
-    else:
-        source_image = sys.argv[1]
-        tile_dir = sys.argv[2]
-        if not os.path.isfile(source_image):
-            show_error("Unable to find image file '{}'".format(source_image))
-        elif not os.path.isdir(tile_dir):
-            show_error("Unable to find tile directory '{}'".format(tile_dir))
-        else:
-            mosaic(source_image, tile_dir)
+@APP.command()
+def main(
+    target_image: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+        help="The image to compose using provided tiles.",
+    ),
+    tile_dir: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+        help="The directory with image tiles.",
+    ),
+    output_image: Path = typer.Option(
+        Path(OUT_FILE),
+        help="Output image path.",
+    ),
+):
+    mosaic(img_path=target_image, tiles_path=tile_dir, output_image=output_image)
 
 
 if __name__ == "__main__":
-    main()
+    APP()
