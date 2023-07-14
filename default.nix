@@ -1,13 +1,18 @@
 { lib, python3, poetry2nix }:
 
-python3.pkgs.buildPythonApplication rec {
+python3.pkgs.buildPythonApplication {
   pname = "mosaic";
   version = "unstable-2023-07-13";
-  format = "setuptools";
-
+  format = "pyproject";
   src = poetry2nix.cleanPythonSources { src = ./.; };
-
-  propagatedBuildInputs = with python3.pkgs; [ pillow ];
+  propagatedBuildInputs = with python3.pkgs;
+    [ typer pillow ] ++ typer.passthru.optional-dependencies.all;
+  nativeBuildInputs = with python3.pkgs; [ setuptools wheel ];
+  checkInputs = with python3.pkgs; [
+    pytestCheckHook
+    pytest
+    pytest-regressions
+  ];
 
   pythonImportsCheck = [ "mosaic" ];
 
