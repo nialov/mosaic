@@ -3,13 +3,18 @@
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs.poetry2nix = {
+    url = "github:nix-community/poetry2nix";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs = { self, ... }@inputs:
     (inputs.flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import inputs.nixpkgs {
           inherit system;
-          overlays = [ self.overlays.default ];
+          overlays =
+            [ self.overlays.default inputs.poetry2nix.overlays.default ];
 
         };
       in {
